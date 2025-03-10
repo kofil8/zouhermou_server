@@ -1,0 +1,395 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+//enum//
+enum UserRole {
+  SUPER_ADMIN
+  ATHLETE
+  COACH
+  GYM_OWNER
+  PROMOTER
+  ADMIN
+}
+
+enum FightingStatus {
+  PRO
+  AMATEUR
+}
+
+enum MartialType {
+  Boxing
+  Muay_Thai
+  Jeet_Kune_Do
+  MMA_Fight
+  Krav_Maga
+  Taekwondo
+}
+
+enum FStanes {
+  Orthodox
+  Unorthodox
+}
+
+enum Gender {
+  Male
+  Female
+  Other
+}
+
+enum SparringRequestStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+enum Status {
+  ACTIVE
+  INACTIVE
+  BLOCKED
+}
+
+enum JoinStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+// MODEL//
+model User {
+  id           String  @id @default(auto()) @map("_id") @db.ObjectId
+  email        String  @unique
+  password     String
+  name         String
+  phoneNumber  String?
+  profileImage String?
+
+  isVerified Boolean @default(false)
+  isOnline   Boolean @default(false)
+  fcmToken   String?
+
+  location Json?
+
+  latitude  Float?
+  longitude Float?
+
+  status Status @default(ACTIVE)
+
+  role      UserRole
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  athlete  Athlete?
+  coach    Coach?
+  gymOwner Gym?
+
+  Otp            Otp[]
+  notifications  Notifications[] @relation("Notifications")
+  message        Message[]       @relation("UserMessages")
+  conversations1 Conversation[]  @relation("User1Conversations")
+  conversations2 Conversation[]  @relation("User2Conversations")
+  Conversation   Conversation[]
+  forums         Forum[]
+  comments       Comment[]
+  likes          Like[]
+  forumViews     ForumView[]
+  events         Event[]
+  eventAttendees EventAttendee[]
+
+  ratees           Rating[]          @relation("Ratee")
+  raters           Rating[]          @relation("Rater")
+  sentRequests     SparringRequest[] @relation("sentRequests")
+  receivedRequests SparringRequest[] @relation("receivedRequests")
+  gymMemberships   GymMembership[]
+
+  @@map("users")
+}
+
+model Athlete {
+  id              String          @id @default(auto()) @map("_id") @db.ObjectId
+  userId          String          @unique @db.ObjectId
+  user            User            @relation(fields: [userId], references: [id])
+  coachId         String?         @db.ObjectId
+  coach           Coach?          @relation(fields: [coachId], references: [id])
+  about           String?
+  fighting        FightingStatus
+  martialArts     MartialType[]
+  experience      Int?
+  gender          Gender
+  country         String?
+  height          Float?
+  weight          Float?
+  age             Int?
+  wins            Int?
+  losses          Int?
+  draws           Int?
+  titles          String?
+  reach           String?
+  fightingStances FStanes?
+  CoachRequest    CoachRequest[]
+  gymMemberships  GymMembership[]
+
+  @@map("athletes")
+}
+
+model Coach {
+  id             String          @id @default(auto()) @map("_id") @db.ObjectId
+  userId         String          @unique @db.ObjectId
+  user           User            @relation(fields: [userId], references: [id])
+  bio            String?
+  age            Int?
+  martialArts    MartialType[]
+  certifications String[]
+  experience     Int?
+  gender         Gender
+  country        String?
+  Athlete        Athlete[]
+  CoachRequest   CoachRequest[]
+  gymMemberships GymMembership[]
+
+  @@map("coaches")
+}
+
+model Gym {
+  id           String        @id @default(auto()) @map("_id") @db.ObjectId
+  userId       String        @unique @db.ObjectId
+  user         User          @relation(fields: [userId], references: [id])
+  description  String
+  location     String
+  country      String?
+  martialArts  MartialType[]
+  trainingTime String?
+
+  openingTimes DateTime?
+  closeTimes   DateTime?
+
+  gymFacilities  String[]
+  gymMemberships GymMembership[]
+
+  @@map("gymOwners")
+}
+
+model GymMembership {
+  id        String     @id @default(auto()) @map("_id") @db.ObjectId
+  athleteId String?    @db.ObjectId
+  coachId   String?    @db.ObjectId
+  gymId     String     @db.ObjectId
+  status    JoinStatus @default(PENDING)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  athlete Athlete? @relation(fields: [athleteId], references: [id])
+  gym     Gym      @relation(fields: [gymId], references: [id])
+  coach   Coach?   @relation(fields: [coachId], references: [id])
+  User    User?    @relation(fields: [userId], references: [id])
+  userId  String?  @db.ObjectId
+
+  @@unique([athleteId, gymId])
+  @@unique([coachId, gymId])
+  @@map("gym_memberships")
+}
+
+model CoachRequest {
+  id        String     @id @default(auto()) @map("_id") @db.ObjectId
+  athleteId String     @db.ObjectId
+  coachId   String     @db.ObjectId
+  status    JoinStatus @default(PENDING)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  athlete Athlete @relation(fields: [athleteId], references: [id])
+  coach   Coach   @relation(fields: [coachId], references: [id])
+
+  @@unique([athleteId, coachId])
+  @@map("coach_requests")
+}
+
+model Promoter {
+  id       String @id @default(auto()) @map("_id") @db.ObjectId
+  location String
+
+  @@map("promoter")
+}
+
+model Otp {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  email     String
+  otp       Int
+  hexCode   String?
+  expiry    DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  User      User?    @relation(fields: [userId], references: [id])
+  userId    String?  @db.ObjectId
+
+  @@map("otps")
+}
+
+model Notifications {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  receiverId String   @db.ObjectId
+  senderId   String   @db.ObjectId
+  title      String
+  body       String
+  read       Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  user       User     @relation(fields: [receiverId], references: [id], name: "Notifications")
+
+  @@map("notifications")
+}
+
+model Conversation {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  user1Id   String    @db.ObjectId
+  user2Id   String    @db.ObjectId
+  messages  Message[] @relation("ConversationMessages")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  // Relationships
+  user1 User @relation("User1Conversations", fields: [user1Id], references: [id])
+  user2 User @relation("User2Conversations", fields: [user2Id], references: [id])
+
+  userId String? @db.ObjectId
+  User   User?   @relation(fields: [userId], references: [id])
+
+  @@map("conversations")
+}
+
+model Message {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  conversationId String   @db.ObjectId
+  senderId       String   @db.ObjectId
+  receiverId     String   @db.ObjectId
+  content        String
+  isRead         Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relationships
+  sender       User         @relation("UserMessages", fields: [senderId], references: [id])
+  conversation Conversation @relation("ConversationMessages", fields: [conversationId], references: [id])
+
+  @@map("messages")
+}
+
+model SparringRequest {
+  id         String                @id @default(auto()) @map("_id") @db.ObjectId
+  senderId   String                @db.ObjectId
+  sender     User                  @relation("sentRequests", fields: [senderId], references: [id])
+  receiverId String                @db.ObjectId
+  receiver   User                  @relation("receivedRequests", fields: [receiverId], references: [id])
+  user1      String                @db.ObjectId
+  user2      String                @db.ObjectId
+  status     SparringRequestStatus @default(PENDING)
+  createdAt  DateTime              @default(now())
+  updatedAt  DateTime              @updatedAt
+
+  @@unique([user1, user2])
+  @@map("sparringRequests")
+}
+
+model Forum {
+  id          String      @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  description String
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  authorId    String      @db.ObjectId
+  author      User        @relation(fields: [authorId], references: [id])
+  comments    Comment[]
+  likes       Like[]
+  views       ForumView[] @relation("ForumViews")
+
+  @@map("forums")
+}
+
+model ForumView {
+  id       String   @id @default(auto()) @map("_id") @db.ObjectId
+  forumId  String   @db.ObjectId
+  forum    Forum    @relation(fields: [forumId], references: [id], name: "ForumViews")
+  userId   String?  @db.ObjectId
+  user     User?    @relation(fields: [userId], references: [id])
+  viewedAt DateTime @default(now())
+
+  @@map("forum_views")
+}
+
+model Comment {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  authorId  String   @db.ObjectId
+  author    User     @relation(fields: [authorId], references: [id])
+  forumId   String   @db.ObjectId
+  forum     Forum    @relation(fields: [forumId], references: [id])
+
+  @@unique([authorId, forumId])
+  @@map("comments")
+}
+
+model Like {
+  id      String  @id @default(auto()) @map("_id") @db.ObjectId
+  userId  String  @db.ObjectId
+  user    User    @relation(fields: [userId], references: [id])
+  forumId String? @db.ObjectId
+  forum   Forum?  @relation(fields: [forumId], references: [id])
+
+  @@unique([userId, forumId])
+  @@map("likes")
+}
+
+model Rating {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  raterId   String   @db.ObjectId
+  rater     User     @relation("Rater", fields: [raterId], references: [id])
+  rateeId   String   @db.ObjectId
+  ratee     User     @relation("Ratee", fields: [rateeId], references: [id])
+  score     Float
+  comment   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([raterId, rateeId])
+  @@map("ratings")
+}
+
+model Event {
+  id          String          @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  description String
+  location    String
+  date        DateTime?
+  time        String
+  image       String
+  ticketLink  String
+  creatorId   String          @db.ObjectId
+  creator     User            @relation(fields: [creatorId], references: [id])
+  attendees   EventAttendee[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@map("events")
+}
+
+model EventAttendee {
+  id        String     @id @default(auto()) @map("_id") @db.ObjectId
+  eventId   String     @db.ObjectId
+  event     Event      @relation(fields: [eventId], references: [id])
+  athleteId String     @db.ObjectId
+  athlete   User       @relation(fields: [athleteId], references: [id])
+  status    JoinStatus @default(PENDING)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@unique([eventId, athleteId])
+  @@map("event_attendees")
+}
